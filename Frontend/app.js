@@ -21,17 +21,19 @@ async function loadDocuments() {
     const tr = document.createElement("tr");
 
     tr.innerHTML = `
-      <td>${doc.filename || "-"}</td>
-      <td>${doc.status || "-"}</td>
-      <td>${doc.metadata?.category || doc.doc_subject_val || "-"}</td>
-      <td>${doc.confidence ?? doc.doc_id_score ?? "-"}</td>
-      <td>
-        <button onclick="showDetail('${doc.id}')">👁️</button>
-        <button onclick="classifyDoc('${doc.id}')">🤖 Klassifizieren</button>
-        <button onclick="processDoc('${doc.id}')">✅ Verarbeiten</button>
-        <button onclick="deleteDoc('${doc.id}')">🗑️ Löschen</button>
-      </td>
-    `;
+  <td><input type="checkbox" class="rowCheckbox" value="${doc.id}"></td>
+  <td>${doc.filename || "-"}</td>
+  <td>${doc.status || "-"}</td>
+  <td>${doc.metadata?.category || doc.doc_subject_val || "-"}</td>
+  <td>${doc.confidence ?? doc.doc_id_score ?? "-"}</td>
+  <td>
+    <button onclick="showDetail('${doc.id}')">👁️</button>
+    <button onclick="classifyDoc('${doc.id}')">🤖 Klassifizieren</button>
+    <button onclick="processDoc('${doc.id}')">✅ Verarbeiten</button>
+    <button onclick="deleteDoc('${doc.id}')">🗑️ Löschen</button>
+  </td>
+`;
+
 
     inboxTable.appendChild(tr);
   });
@@ -123,3 +125,60 @@ window.classifyDoc = classifyDoc;
 window.deleteDoc = deleteDoc;
 
 // Optional: Automatische Aktualisierung alle 5 Sekunden
+
+// Upload-Button
+document.getElementById("uploadBtn").addEventListener("click", () => {
+  document.getElementById("uploadInput").click();
+});
+
+document.getElementById("uploadInput").addEventListener("change", async (e) => {
+  const files = Array.from(e.target.files);
+  for (const file of files) {
+    const formData = new FormData();
+    formData.append("pdf", file);
+
+    const res = await fetch(`${API_URL}/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (res.ok) {
+      console.log(`✅ Hochgeladen: ${file.name}`);
+    } else {
+      alert(`❌ Fehler beim Hochladen: ${file.name}`);
+    }
+  }
+  loadDocuments();
+});
+
+// Checkboxen
+document.getElementById("selectAll").addEventListener("change", (e) => {
+  document.querySelectorAll(".rowCheckbox").forEach(cb => cb.checked = e.target.checked);
+});
+
+function getSelectedIds() {
+  return Array.from(document.querySelectorAll(".rowCheckbox:checked")).map(cb => cb.value);
+}
+
+// Mehrfachaktionen
+document.getElementById("multiProcess").addEventListener("click", async () => {
+  for (const id of getSelectedIds()) {
+    await fetch(`${API_URL}/documents/${id}/process`, { method: "POST" });
+  }
+  loadDocuments();
+});
+
+document.getElementById("multiClassify").addEventListener("click", async () => {
+  for (const id of getSelectedIds()) {
+    await fetch(`${API_URL}/documents/${id}/classify`, { method: "POST" });
+  }
+  loadDocuments();
+});
+
+document.getElementById("multiDelete").addEventListener("click", async () => {
+  for (const id of getSelectedIds()) {
+    await fetch(`${API_URL}/documents/${id}`, { method: "DELETE" });
+  }
+  loadDocuments();
+});
+
