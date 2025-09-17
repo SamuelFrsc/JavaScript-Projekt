@@ -123,4 +123,3 @@ window.classifyDoc = classifyDoc;
 window.deleteDoc = deleteDoc;
 
 // Optional: Automatische Aktualisierung alle 5 Sekunden
-setInterval(loadDocuments, 5000);
