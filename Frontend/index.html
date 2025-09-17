@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Intelligenter Posteingang</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>📥 Intelligenter Posteingang</h1>
+    <button id="refreshBtn">🔄 Aktualisieren</button>
+  </header>
+
+  <main>
+    <section id="inbox">
+      <h2>Inbox</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Datei</th>
+            <th>Status</th>
+            <th>Kategorie</th>
+            <th>Confidence</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="inboxTable"></tbody>
+      </table>
+    </section>
+
+    <section id="detailView" class="hidden">
+      <h2>Dokument-Detail</h2>
+      <div id="docDetails"></div>
+      <button id="closeDetail">❌ Schließen</button>
+    </section>
+  </main>
+<script>
+  console.log("✅ Inline Script läuft!");
+</script>
+  <script src="app.js"></script>
+</body>
+</html>
