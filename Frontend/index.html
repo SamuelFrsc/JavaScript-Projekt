@@ -8,15 +8,26 @@
 <body>
   <header>
     <h1>📥 Intelligenter Posteingang</h1>
-    <button id="refreshBtn">🔄 Aktualisieren</button>
+    <div>
+      <button id="refreshBtn">🔄 Aktualisieren</button>
+      <input type="file" id="uploadInput" accept="application/pdf" multiple hidden>
+      <button id="uploadBtn">📤 PDF hochladen</button>
+    </div>
   </header>
 
   <main>
     <section id="inbox">
       <h2>Inbox</h2>
+      <div>
+        <button id="multiProcess">✅ Ausgewählte verarbeiten</button>
+        <button id="multiClassify">🤖 Ausgewählte klassifizieren</button>
+        <button id="multiDelete">🗑️ Ausgewählte löschen</button>
+      </div>
+
       <table>
         <thead>
           <tr>
+            <th><input type="checkbox" id="selectAll"></th>
             <th>Datei</th>
             <th>Status</th>
             <th>Kategorie</th>
@@ -34,9 +45,7 @@
       <button id="closeDetail">❌ Schließen</button>
     </section>
   </main>
-<script>
-  console.log("✅ Inline Script läuft!");
-</script>
+
   <script src="app.js"></script>
 </body>
 </html>

@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import fsPromises from "fs/promises";
+import pdf from "pdf-parse";
 
 const app = express();
 app.use(bodyParser.json());
@@ -68,7 +69,6 @@ const initFromInbox = async () => {
 
 // ---- Beim Start einmal scannen + alle 5 Sekunden erneut ----
 initFromInbox();
-setInterval(initFromInbox, 5000);
 
 // ---- API-Routen ----
 
@@ -210,4 +210,24 @@ app.get("/", (req, res) => {
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server läuft auf http://localhost:${PORT}`);
+});
+
+import multer from "multer";
+
+// Upload-Ordner vorbereiten
+const upload = multer({ dest: path.join(__dirname, "inbox") });
+
+// Upload-Endpunkt
+app.post("/upload", upload.single("pdf"), async (req, res) => {
+  const file = req.file;
+  if (!file || !file.originalname.endsWith(".pdf")) {
+    return res.status(400).json({ error: "Nur PDF-Dateien erlaubt." });
+  }
+
+  const newFilename = file.originalname.replace(/[^a-zA-Z0-9_\-.]/g, "_");
+  const newPath = path.join(__dirname, "inbox", newFilename);
+
+  await fsPromises.rename(file.path, newPath);
+  console.log("📥 PDF hochgeladen:", newFilename);
+  res.status(201).json({ message: "Upload erfolgreich", filename: newFilename });
 });
