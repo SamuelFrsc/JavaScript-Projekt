@@ -567,6 +567,43 @@ setInterval(async () => {
   if (toDelete.length) await saveDb();
 }, 6 * 60 * 60 * 1000);
 
+// 3) Auto-Cleaner: löscht alle "deleted"-Dokumente sofort alle X Minuten
+const AUTO_DELETE_INTERVAL_MS = 60 * 1000; // 1 Minute – kannst du anpassen
+
+setInterval(async () => {
+  try {
+    const toDelete = [];
+    for (const [id, doc] of Object.entries(documents)) {
+      if (doc.status === "deleted") {
+        toDelete.push({ id, filename: doc.filename });
+      }
+    }
+
+    for (const entry of toDelete) {
+      try {
+        // Datei im Deleted-Ordner löschen
+        await fsPromises.rm(path.join(DELETED_DIR, entry.filename), { force: true });
+
+        // Dokument aus DB entfernen
+        delete documents[entry.id];
+
+        console.log("🗑️ Auto gelöscht:", entry.id);
+      } catch (e) {
+        console.error("Auto-Löschen fehlgeschlagen:", e.message);
+      }
+    }
+
+    if (toDelete.length) {
+      await saveDb(); // Änderungen in documents.json sichern
+    }
+  } catch (e) {
+    console.error("Auto-Cleaner Fehler:", e.message);
+  }
+}, AUTO_DELETE_INTERVAL_MS);
+
+
+
+
 // ---------------Neuer api Code
 // Neue Route: Klassifizierung + Dokumentliste
 app.get("/api/classify/sync-now", async (req, res) => {
