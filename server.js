@@ -275,7 +275,8 @@ function mapClassifierResult(r) {
   const dateScore = score(r, "doc_date_sic_score");
 
   const scores = [docIdScore, subjectScore, dateScore].filter((s) => typeof s === "number");
-  const confidence = scores.length ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2)) : 0.5;
+  const confidence = scores.length ? Number(Math.min(...scores).toFixed(2)) : 0.0;
+
 
   return {
     metadata: {
