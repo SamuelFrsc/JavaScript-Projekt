@@ -3,6 +3,11 @@
 
 // Wenn Frontend und BFF auf dem selben Origin laufen, leer lassen:
 const API_URL = ""; // z.B. "", sonst "http://localhost:3000"
+let currentViewIds = [];
+const nextDetailBtn = document.getElementById("nextDetailBtn");
+
+const profileSelect = document.getElementById("profileSelect");
+
 
 const CURRENT_USER = "backoffice-demo";
 const commonHeaders = { "X-User": CURRENT_USER };
@@ -52,6 +57,7 @@ function fmtConf(conf) {
 }
 
 function renderRows(list) {
+  currentViewIds = list.map(d => d.id);  // <- Reihenfolge sichern
   rowsEl.innerHTML = "";
   list.forEach((doc) => {
     const tr = document.createElement("tr");
@@ -153,7 +159,7 @@ if (doc.status === "processed") {
 async function saveCurrentMeta() {
   if (!currentDoc) return;
 
-  // 1. Werte aus den Eingabefeldern
+  // 1) Werte aus den Eingabefeldern
   let newMeta = {
     category: editCategory.value || undefined,
     docId: editDocId.value || undefined,
@@ -161,7 +167,7 @@ async function saveCurrentMeta() {
     docDate: editDocDate.value || undefined,
   };
 
-  // 2. Wenn processed → JSON dazu mergen (Inputs haben Vorrang!)
+  // 2) Wenn processed → JSON dazu mergen (Inputs haben Vorrang!)
   if (currentDoc.status === "processed") {
     try {
       const parsedJson = JSON.parse(metadataJson.value);
@@ -171,22 +177,53 @@ async function saveCurrentMeta() {
       return;
     }
   }
+  async function processCurrentNow() {
+  if (!currentDoc) return;
+  try {
+    const res = await fetch(`${API_URL}/documents/${currentDoc.id}/process`, {
+      method: "POST",
+      headers: commonHeaders,
+    });
+    if (!res.ok) {
+      alert("Verarbeiten fehlgeschlagen");
+      return;
+    }
+    await loadDocuments();
 
-  // 3. Payload bauen
+    if (openNextAfterSave.checked) {
+      detailModal.classList.add("hidden");
+      openNext("needs_review");
+    } else {
+      detailModal.classList.add("hidden");
+    }
+  } catch (e) {
+    alert("Fehler beim Verarbeiten: " + e.message);
+  }
+}
+
+
+  // 🔹 3) PROFIL -> nutzer setzen (nach dem Merge, damit es sicher gewinnt)
+  const selectedProfileText =
+    profileSelect
+      ? profileSelect.options[profileSelect.selectedIndex].text  // "Profil 1", ...
+      : "Profil 1"; // Fallback
+  newMeta.nutzer = selectedProfileText;
+
+  // 4) Payload bauen
   const payload = {
     metadata: newMeta,
     confidence: editConfidence.value ? parseFloat(editConfidence.value) : undefined,
     mode: "corrected",
   };
 
-  // 4. PUT an Backend
+  // 5) PUT an Backend
   await fetch(`${API_URL}/documents/${currentDoc.id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...commonHeaders },
     body: JSON.stringify(payload),
   });
 
-  // 5. Tabelle aktualisieren + Modal schließen
+  // 6) UI aktualisieren
   await loadDocuments();
   if (openNextAfterSave.checked) {
     detailModal.classList.add("hidden");
@@ -195,6 +232,7 @@ async function saveCurrentMeta() {
     detailModal.classList.add("hidden");
   }
 }
+
 
 
 // ---------------------------
@@ -217,7 +255,7 @@ document.getElementById("uploadInput").addEventListener("change", async (e) => {
 });
 
 document.getElementById("refreshBtn").addEventListener("click", loadDocuments);
-document.getElementById("nextBtn").addEventListener("click", () => openNext("needs_review"));
+
 statusFilterEl.addEventListener("change", loadDocuments);
 
 selectAllEl.addEventListener("change", (e) => {
@@ -286,12 +324,41 @@ document.getElementById("bulkDelete").addEventListener("click", async () => {
   await loadDocuments();
 });
 
+// Detail-Modal Steuerung
+
+function getIndexInCurrentView() {
+  if (!currentDoc) return -1;
+
+  // 1) Primär: gespeicherte Reihenfolge aus renderRows
+  let idx = currentViewIds.indexOf(currentDoc.id);
+
+  // 2) Fallback: Reihenfolge live aus dem DOM lesen
+  if (idx === -1) {
+    const idsFromDom = Array.from(document.querySelectorAll(".rowCheckbox"))
+      .map(cb => cb.dataset.id);
+    currentViewIds = idsFromDom;
+    idx = currentViewIds.indexOf(currentDoc.id);
+  }
+  return idx;
+}
+
+function openNextInCurrentView() {
+  const idx = getIndexInCurrentView();
+  if (idx >= 0 && idx < currentViewIds.length - 1) {
+    const nextId = currentViewIds[idx + 1];
+    detailModal.classList.add("hidden");   // aktuelle schließen
+    openDetail(nextId);                    // nächste öffnen
+  } else {
+    alert("Kein weiteres Dokument in der aktuellen Liste.");
+  }
+}
+
+nextDetailBtn?.addEventListener("click", openNextInCurrentView);
 
 
 // Detail-Modal Steuerung
 closeDetailBtn.addEventListener("click", () => detailModal.classList.add("hidden"));
 saveMetadataBtn.addEventListener("click", saveCurrentMeta);
-processNowBtn.addEventListener("click", processCurrentNow);
 
 // Initial
 loadDocuments();

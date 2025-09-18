@@ -105,18 +105,25 @@ function createDocForFile(filename, origin = "scanner") {
   const doc = {
     id,
     filename,
-    status: "inbox", // inbox | needs_review | processing | hold | processed | deleted
-    origin, // 'scanner' | 'manual'
+    status: "inbox",
+    origin,                 // 'scanner' | 'manual'
     confidence: null,
-    metadata: {},
-    mode: "auto", // auto | corrected | manual
+    metadata: {},           // <- gleich danach setzen
+    mode: "auto",
     user: null,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
+
+  // NEU: Metadatum "verarbeitung"
+  if (origin === "scanner") {
+    doc.metadata.verarbeitung = "vollautomatisch";
+  }
+
   documents[id] = doc;
   return doc;
 }
+
 
 function filePathForStatus(doc) {
   switch (doc.status) {
@@ -325,6 +332,8 @@ app.get("/documents/:id", (req, res) => {
 });
 
 // Dokument aktualisieren (Metadaten, Confidence, Mode, Status)
+// Dokument aktualisieren (Metadaten, Confidence, Mode, Status)
+// Dokument aktualisieren (Metadaten, Confidence, Mode, Status)
 app.put("/documents/:id", async (req, res) => {
   const user = req.header("X-User") || "unbekannt";
   const doc = documents[req.params.id];
@@ -332,7 +341,26 @@ app.put("/documents/:id", async (req, res) => {
 
   const { metadata, confidence, mode, status } = req.body || {};
 
-  if (metadata && typeof metadata === "object") doc.metadata = { ...doc.metadata, ...metadata };
+  // Vorher merken, ob es bereits Nutz-Metadaten gab
+  const hadMetaBefore = hasAnyUserMetadata(doc.metadata);
+
+  if (metadata && typeof metadata === "object") {
+    // Merge
+    doc.metadata = { ...doc.metadata, ...metadata };
+
+    // Nach Merge prüfen, ob jetzt Nutz-Metadaten vorhanden sind
+    const hasMetaNow = hasAnyUserMetadata(doc.metadata);
+
+    // Logik "verarbeitung":
+    // - Wenn Upload (origin === 'manual') und vorher KEINE Metadaten, jetzt aber welche => "manuell"
+    // - sonst (bei späteren Änderungen oder nicht-manual) => "korrigiert"
+    if (doc.origin === "manual" && !hadMetaBefore && hasMetaNow) {
+      doc.metadata.verarbeitung = "manuell";
+    } else {
+      doc.metadata.verarbeitung = "korrigiert";
+    }
+  }
+
   if (typeof confidence === "number") doc.confidence = confidence;
   if (mode) doc.mode = mode;
   if (status) doc.status = status;
@@ -342,6 +370,8 @@ app.put("/documents/:id", async (req, res) => {
   await saveDb();
   res.json(doc);
 });
+
+
 
 // Upload eines PDFs
 app.post("/upload", upload.single("pdf"), async (req, res) => {
@@ -458,6 +488,13 @@ async function classifyHandler(req, res) {
     res.status(502).json({ error: "Classifier nicht erreichbar", detail: e.message });
   }
 }
+
+function hasAnyUserMetadata(meta) {
+  if (!meta || typeof meta !== "object") return false;
+  // Als "Nutzdaten" zählen alles außer "verarbeitung"
+  return Object.keys(meta).some(k => k !== "verarbeitung" && meta[k] != null && String(meta[k]).trim() !== "");
+}
+
 
 // beide Routen nutzen denselben Handler
 app.post("/documents/:id/classify", classifyHandler);
