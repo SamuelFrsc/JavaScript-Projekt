@@ -181,7 +181,7 @@ function findOrCreateDocByFilename(filename, origin = "scanner") {
   return doc;
 }
 
-function applyClassificationToDoc(doc, classification, user = "system") {
+async function applyClassificationToDoc(doc, classification, user = "system") {
   doc.metadata = {
     ...doc.metadata,
     category: classification.category ?? doc.metadata.category,
@@ -194,19 +194,22 @@ function applyClassificationToDoc(doc, classification, user = "system") {
     doc.confidence = classification.confidence;
   }
 
-  // 🔽 NEU: Status-Logik
   if (doc.confidence != null && doc.confidence < 0.60) {
-    doc.status = "needs_review";
-  } else if (doc.confidence >= AUTO_PROCESS_THRESHOLD) {
-    doc.status = "processed";
-  } else {
-    doc.status = "inbox";
-  }
-
+  await moveDocFile(doc, NEEDS_REVIEW_DIR);   // zuerst verschieben
+  doc.status = "needs_review";                // dann Status setzen
+} else if (doc.confidence >= AUTO_PROCESS_THRESHOLD) {
+  await moveDocFile(doc, PROCESSING_DIR);
+  doc.status = "processed";
+  await writeOutboxMetadata(doc);
+} else {
+  await moveDocFile(doc, INBOX_DIR);
+  doc.status = "inbox";
+}
   doc.mode = doc.mode === "manual" ? "manual" : "auto";
   doc.user = user;
   doc.updatedAt = nowIso();
 }
+
 
 
 
@@ -585,7 +588,7 @@ app.get("/api/classify/sync-now", async (req, res) => {
         const classification = await classifyByUuid(uuid);
 
         const dbDoc = findOrCreateDocByFilename(file, "scanner");
-        applyClassificationToDoc(dbDoc, classification, "system");
+        await applyClassificationToDoc(dbDoc, classification, "system");
         dirty = true; // 🔽 wichtig
 
         results.push(buildRowForFrontend(dbDoc));
