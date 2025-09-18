@@ -123,9 +123,8 @@ function filePathForStatus(doc) {
     case "inbox":
       return path.join(INBOX_DIR, doc.filename);
     case "processing":
+    case "processed":   // ✅ beide zeigen auf denselben Ordner
       return path.join(PROCESSING_DIR, doc.filename);
-    case "processed":
-      return path.join(OUTBOX_DIR, doc.filename);
     case "hold":
       return path.join(HOLD_DIR, doc.filename);
     case "deleted":
@@ -137,10 +136,11 @@ function filePathForStatus(doc) {
   }
 }
 
+
 async function moveDocFile(doc, targetDir) {
-  const from = filePathForStatus(doc);
+  const from = filePathForStatus({ ...doc, status: doc.status }); // aktueller Ort
   const to = path.join(targetDir, doc.filename);
-  // versuche rename, fallback: copy+unlink
+
   try {
     await fsPromises.rename(from, to);
   } catch {
@@ -153,6 +153,7 @@ async function moveDocFile(doc, targetDir) {
     }
   }
 }
+
 
 async function writeOutboxMetadata(doc) {
   const metaPath = path.join(PROCESSING_DIR, `${doc.id}.json`);
@@ -318,7 +319,7 @@ app.get("/documents/next", (req, res) => {
 
 // Einzelnes Dokument
 app.get("/documents/:id", (req, res) => {
-  const doc = lastSyncedDocuments.find(d => d.id === req.params.id);
+  const doc = documents[req.params.id];
   if (!doc) return res.status(404).json({ error: "Not found" });
   res.json(doc);
 });

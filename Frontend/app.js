@@ -6,6 +6,7 @@ const API_URL = ""; // z.B. "", sonst "http://localhost:3000"
 
 const CURRENT_USER = "backoffice-demo";
 const commonHeaders = { "X-User": CURRENT_USER };
+const metadataJson = document.getElementById("metadataJson");
 
 const rowsEl = document.getElementById("rows");
 const selectAllEl = document.getElementById("selectAll");
@@ -37,7 +38,7 @@ function linkForDoc(doc) {
     inbox: "inbox",
     processing: "processing",
     hold: "hold",
-    processed: "processsing",
+    processed: "processing",
     deleted: null, // nicht anzeigen
     needs_review: "needs-review",
   };
@@ -138,25 +139,54 @@ async function openDetail(id) {
   editDocDate.value = doc.metadata?.docDate || "";
   editConfidence.value = typeof doc.confidence === "number" ? String(doc.confidence) : "";
   detailModal.classList.remove("hidden");
+
+  metadataJson.value = JSON.stringify(doc.metadata || {}, null, 2);
+
+if (doc.status === "processed") {
+  metadataJson.removeAttribute("readonly");
+} else {
+  metadataJson.setAttribute("readonly", "true");
+}
+
 }
 
 async function saveCurrentMeta() {
   if (!currentDoc) return;
+
+  // 1. Werte aus den Eingabefeldern
+  let newMeta = {
+    category: editCategory.value || undefined,
+    docId: editDocId.value || undefined,
+    subject: editSubject.value || undefined,
+    docDate: editDocDate.value || undefined,
+  };
+
+  // 2. Wenn processed → JSON dazu mergen (Inputs haben Vorrang!)
+  if (currentDoc.status === "processed") {
+    try {
+      const parsedJson = JSON.parse(metadataJson.value);
+      newMeta = { ...parsedJson, ...newMeta };
+    } catch (e) {
+      alert("❌ Ungültiges JSON: " + e.message);
+      return;
+    }
+  }
+
+  // 3. Payload bauen
   const payload = {
-    metadata: {
-      category: editCategory.value || undefined,
-      docId: editDocId.value || undefined,
-      subject: editSubject.value || undefined,
-      docDate: editDocDate.value || undefined,
-    },
+    metadata: newMeta,
     confidence: editConfidence.value ? parseFloat(editConfidence.value) : undefined,
     mode: "corrected",
   };
+
+  // 4. PUT an Backend
   await fetch(`${API_URL}/documents/${currentDoc.id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...commonHeaders },
     body: JSON.stringify(payload),
   });
+
+  // 5. Tabelle aktualisieren + Modal schließen
   await loadDocuments();
   if (openNextAfterSave.checked) {
     detailModal.classList.add("hidden");
@@ -166,17 +196,6 @@ async function saveCurrentMeta() {
   }
 }
 
-async function processCurrentNow() {
-  if (!currentDoc) return;
-  await fetch(`${API_URL}/documents/${currentDoc.id}/process`, { method: "POST", headers: commonHeaders });
-  await loadDocuments();
-  if (openNextAfterSave.checked) {
-    detailModal.classList.add("hidden");
-    openNext("needs_review");
-  } else {
-    detailModal.classList.add("hidden");
-  }
-}
 
 // ---------------------------
 // Aktionen
@@ -233,6 +252,41 @@ rowsEl.addEventListener("click", async (e) => {
     }
   }
 });
+
+function getSelectedIds() {
+  return Array.from(document.querySelectorAll(".rowCheckbox:checked"))
+    .map(cb => cb.dataset.id);
+}
+
+document.getElementById("bulkProcess").addEventListener("click", async () => {
+  const ids = getSelectedIds();
+  if (!ids.length) return alert("Keine Dokumente ausgewählt.");
+  for (const id of ids) {
+    await fetch(`${API_URL}/documents/${id}/process`, { method: "POST", headers: commonHeaders });
+  }
+  await loadDocuments();
+});
+
+document.getElementById("bulkHold").addEventListener("click", async () => {
+  const ids = getSelectedIds();
+  if (!ids.length) return alert("Keine Dokumente ausgewählt.");
+  for (const id of ids) {
+    await fetch(`${API_URL}/documents/${id}/hold`, { method: "POST", headers: commonHeaders });
+  }
+  await loadDocuments();
+});
+
+document.getElementById("bulkDelete").addEventListener("click", async () => {
+  const ids = getSelectedIds();
+  if (!ids.length) return alert("Keine Dokumente ausgewählt.");
+  if (!confirm("Ausgewählte Dokumente wirklich in 'deleted' verschieben?")) return;
+  for (const id of ids) {
+    await fetch(`${API_URL}/documents/${id}/delete`, { method: "POST", headers: commonHeaders });
+  }
+  await loadDocuments();
+});
+
+
 
 // Detail-Modal Steuerung
 closeDetailBtn.addEventListener("click", () => detailModal.classList.add("hidden"));
